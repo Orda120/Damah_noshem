@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-damah_noshem}
+      POSTGRES_USER: ${POSTGRES_USER:-damah_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-damah_pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-damah_user} -d ${POSTGRES_DB:-damah_noshem}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: ${API_DATABASE_URL:-postgresql+psycopg://damah_user:damah_pass@db:5432/damah_noshem}
+      JWT_SECRET: ${API_JWT_SECRET:-change-me}
+      STORAGE_MODE: ${API_STORAGE_MODE:-filesystem}
+      STORAGE_BASE_PATH: ${API_STORAGE_BASE_PATH:-/data/artifacts}
+      ACCESS_POLICY_ENABLED: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/workspace
+      - artifact_data:/data/artifacts
+    working_dir: /workspace/apps/api
+    command: >
+      sh -c "alembic upgrade head &&
+      python -m app.db.seed &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      API_BASE_URL: ${WEB_API_BASE_URL:-http://api:8000/api/v1}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: sh -c "npm install && npm run dev --workspace @damah-noshem/web -- --hostname 0.0.0.0 --port 3000"
+
+volumes:
+  postgres_data:
+  artifact_data:

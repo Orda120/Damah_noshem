@@ -1,0 +1,15 @@
+{
+  "name": "damah-noshem",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @damah-noshem/web",
+    "build:web": "npm run build --workspace @damah-noshem/web",
+    "lint:web": "npm run lint --workspace @damah-noshem/web",
+    "typecheck:web": "npm run typecheck --workspace @damah-noshem/web"
+  }
+}
