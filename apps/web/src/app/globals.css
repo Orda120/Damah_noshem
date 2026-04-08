@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-canvas text-ink font-sans;
+}
+
+a {
+  @apply text-inherit no-underline;
+}
+
+.page-shell {
+  background:
+    radial-gradient(circle at top left, rgba(29, 111, 95, 0.12), transparent 30%),
+    linear-gradient(180deg, #f7f1e4 0%, #f4efe7 100%);
+}
