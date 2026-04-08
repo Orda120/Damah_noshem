@@ -3,6 +3,10 @@ import type { NextRequest } from "next/server";
 
 import { locales } from "@damah-noshem/shared";
 
+export function defaultLocalePath(pathname: string) {
+  return `/he${pathname === "/" ? "/login" : pathname}`;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (
@@ -16,7 +20,7 @@ export function middleware(request: NextRequest) {
   const hasLocale = locales.some((locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`));
   if (!hasLocale) {
     const url = request.nextUrl.clone();
-    url.pathname = `/he${pathname === "/" ? "/login" : pathname}`;
+    url.pathname = defaultLocalePath(pathname);
     return NextResponse.redirect(url);
   }
   return NextResponse.next();

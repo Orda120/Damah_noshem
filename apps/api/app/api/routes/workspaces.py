@@ -12,10 +12,12 @@ from app.db.models import AppUser, CurrentPayload, LineItem, Template, Workspace
 from app.db.session import get_db
 from app.schemas.api import (
     LineItemCreateInput,
+    LineItemUpdateRequest,
     ParticipantInput,
     PayloadSaveRequest,
     WorkspaceCreateRequest,
     WorkspaceStatusChangeRequest,
+    WorkspaceUpdateRequest,
 )
 from app.schemas.serializers import serialize_workspace_detail
 from app.services.authorization import authorize
@@ -25,6 +27,8 @@ from app.services.workflow import (
     change_workspace_status,
     create_workspace,
     save_payload_revision,
+    update_line_item,
+    update_workspace,
 )
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
@@ -95,6 +99,25 @@ def get_workspace(
     return serialize_workspace_detail(session=db, workspace=workspace, template=template, submitter_view=submitter_view)
 
 
+@router.patch("/{workspace_id}")
+def update_workspace_route(
+    workspace_id: UUID,
+    payload: WorkspaceUpdateRequest,
+    current_user: AppUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    workspace = db.get(Workspace, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
+    authorize(session=db, user=current_user, required_roles=[RoleCode.ADMIN], access_group_id=workspace.access_group_id)
+    update_workspace(db, workspace=workspace, payload=payload)
+    db.commit()
+    template = db.scalar(
+        select(Template).options(selectinload(Template.field_definitions)).where(Template.template_id == workspace.template_id)
+    )
+    return serialize_workspace_detail(session=db, workspace=workspace, template=template, submitter_view=False)
+
+
 @router.post("/{workspace_id}/participants", status_code=status.HTTP_201_CREATED)
 def add_participant_route(
     workspace_id: UUID,
@@ -115,6 +138,36 @@ def add_participant_route(
     }
 
 
+@router.get("/{workspace_id}/line-items")
+def list_workspace_line_items(
+    workspace_id: UUID,
+    current_user: AppUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    workspace = db.get(Workspace, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
+    authorize(
+        session=db,
+        user=current_user,
+        required_roles=[],
+        access_group_id=workspace.access_group_id,
+        workspace_id=workspace.workspace_id,
+        participant_roles=[ParticipantRole.SUBMITTER, ParticipantRole.REVIEWER, ParticipantRole.ADMIN, ParticipantRole.VIEWER],
+    )
+    line_items = db.scalars(select(LineItem).where(LineItem.workspace_id == workspace_id).order_by(LineItem.created_at)).all()
+    return [
+        {
+            "line_item_id": str(line_item.line_item_id),
+            "line_item_key": line_item.line_item_key,
+            "line_item_title": line_item.line_item_title,
+            "line_item_status": line_item.line_item_status.value,
+            "closed_reason": line_item.closed_reason,
+        }
+        for line_item in line_items
+    ]
+
+
 @router.post("/{workspace_id}/line-items", status_code=status.HTTP_201_CREATED)
 def add_line_item_route(
     workspace_id: UUID,
@@ -133,6 +186,36 @@ def add_line_item_route(
         "line_item_key": line_item.line_item_key,
         "line_item_title": line_item.line_item_title,
         "line_item_status": line_item.line_item_status.value,
+    }
+
+
+@router.patch("/line-items/{line_item_id}")
+def update_line_item_route(
+    line_item_id: UUID,
+    payload: LineItemUpdateRequest,
+    current_user: AppUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    line_item = db.get(LineItem, line_item_id)
+    if line_item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Line item not found.")
+    workspace = db.get(Workspace, line_item.workspace_id)
+    authorize(
+        session=db,
+        user=current_user,
+        required_roles=[RoleCode.ADMIN, RoleCode.REVIEWER],
+        access_group_id=workspace.access_group_id,
+        workspace_id=workspace.workspace_id,
+        participant_roles=[ParticipantRole.ADMIN, ParticipantRole.REVIEWER],
+    )
+    update_line_item(line_item=line_item, payload=payload)
+    db.commit()
+    return {
+        "line_item_id": str(line_item.line_item_id),
+        "line_item_key": line_item.line_item_key,
+        "line_item_title": line_item.line_item_title,
+        "line_item_status": line_item.line_item_status.value,
+        "closed_reason": line_item.closed_reason,
     }
 
 
@@ -283,3 +366,45 @@ def list_workspace_revisions(
         }
         for revision in revisions
     ]
+
+
+@router.get("/{workspace_id}/revisions/{revision_id}")
+def get_workspace_revision_detail(
+    workspace_id: UUID,
+    revision_id: UUID,
+    current_user: AppUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    workspace = db.get(Workspace, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
+    authorize(
+        session=db,
+        user=current_user,
+        required_roles=[],
+        access_group_id=workspace.access_group_id,
+        workspace_id=workspace.workspace_id,
+        participant_roles=[ParticipantRole.SUBMITTER, ParticipantRole.REVIEWER, ParticipantRole.ADMIN, ParticipantRole.VIEWER],
+    )
+    revision = db.get(WorkspaceRevision, revision_id)
+    if revision is None or revision.workspace_id != workspace_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found.")
+    payloads = db.scalars(
+        select(CurrentPayload).where(CurrentPayload.workspace_revision_id == revision_id).order_by(CurrentPayload.created_at)
+    ).all()
+    return {
+        "workspace_revision_id": str(revision.workspace_revision_id),
+        "revision_number": revision.revision_number,
+        "revision_reason": revision.revision_reason.value,
+        "created_at": revision.created_at.isoformat(),
+        "payloads": [
+            {
+                "current_payload_id": str(item.current_payload_id),
+                "line_item_id": str(item.line_item_id) if item.line_item_id else None,
+                "payload_json": item.payload_json,
+                "payload_archived": item.payload_archived,
+                "payload_artifact_id": str(item.payload_artifact_id) if item.payload_artifact_id else None,
+            }
+            for item in payloads
+        ],
+    }

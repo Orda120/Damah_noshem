@@ -17,6 +17,7 @@ from app.db.enums import (
     OutputScopeType,
     ParticipantRole,
     RecommendedAction,
+    RestoreStatus,
     RevisionReason,
     TemplateStatus,
     WorkspaceStatus,
@@ -30,6 +31,28 @@ class ApiModel(BaseModel):
 class LoginPasswordRequest(ApiModel):
     username: str
     password: str
+
+
+class SsoLoginStartRequest(ApiModel):
+    provider: str = "stub"
+
+
+class SsoLoginCallbackRequest(ApiModel):
+    provider: str = "stub"
+    external_subject: str
+    email: str
+
+
+class IdentityLinkRequest(ApiModel):
+    provider: str = "stub"
+    external_subject: str
+    email: str
+    username: str
+    password: str
+
+
+class PreferencesUpdateRequest(ApiModel):
+    default_language: LanguageCode
 
 
 class AccessCodeIssueRequest(ApiModel):
@@ -47,6 +70,10 @@ class GroupCreateRequest(ApiModel):
 class MembershipGrantRequest(ApiModel):
     app_user_id: UUID
     membership_role: MembershipRole = MembershipRole.MEMBER
+
+
+class MembershipRoleUpdateRequest(ApiModel):
+    membership_role: MembershipRole
 
 
 class TemplateFieldDefinitionInput(ApiModel):
@@ -104,10 +131,21 @@ class WorkspaceStatusChangeRequest(ApiModel):
     change_reason: str | None = None
 
 
+class WorkspaceUpdateRequest(ApiModel):
+    workspace_title: str | None = None
+    business_date: date | None = None
+
+
 class PayloadSaveRequest(ApiModel):
     expected_revision_number: int
     payload_json: dict
     revision_reason: RevisionReason
+
+
+class LineItemUpdateRequest(ApiModel):
+    line_item_title: str | None = None
+    line_item_status: LineItemStatus | None = None
+    closed_reason: str | None = None
 
 
 class CommentCreateRequest(ApiModel):
@@ -155,6 +193,23 @@ class ArchivePayloadRequest(ApiModel):
 class RestoreRequest(ApiModel):
     archive_catalog_entry_id: UUID
     reason: str | None = None
+
+
+class RestoreStatusResponse(ApiModel):
+    archive_restore_request_id: UUID
+    archive_catalog_entry_id: UUID
+    status: RestoreStatus
+    requested_at: datetime
+    completed_at: datetime | None = None
+    reason: str | None = None
+    failure_reason: str | None = None
+
+
+class ArtifactLinkRequest(ApiModel):
+    artifact_id: UUID
+    entity_type: ArtifactEntityType
+    entity_id: UUID
+    link_role: ArtifactLinkRole
 
 
 class MeResponse(ApiModel):

@@ -7,8 +7,18 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.db.enums import ArtifactEntityType, ArtifactLinkRole, ArtifactType, SnapshotType
-from app.db.models import ArchiveCatalogEntry, AppUser, Artifact, ArtifactLink, CurrentPayload, PayloadSnapshot, Workspace
+from app.db.enums import ArtifactEntityType, ArtifactLinkRole, ArtifactType, RestoreStatus, SnapshotType
+from app.db.models import (
+    ArchiveCatalogEntry,
+    ArchiveRestoreRequest,
+    AppUser,
+    Artifact,
+    ArtifactLink,
+    CurrentPayload,
+    LineItem,
+    PayloadSnapshot,
+    Workspace,
+)
 from app.schemas.api import ArchivePayloadRequest, RestoreRequest
 from app.services.audit import log_audit_event
 from app.storage.factory import get_storage
@@ -27,6 +37,7 @@ def archive_current_payload(
     if current_payload.payload_json is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload body is empty.")
 
+    line_item = session.get(LineItem, current_payload.line_item_id) if current_payload.line_item_id else None
     serialized = json.dumps(current_payload.payload_json, ensure_ascii=False).encode("utf-8")
     storage = get_storage()
     stored = storage.write_bytes(
@@ -74,7 +85,7 @@ def archive_current_payload(
             workspace_revision_id=current_payload.workspace_revision_id,
             business_date=workspace.business_date,
             access_group_id=workspace.access_group_id,
-            status_at_archive_time=None,
+            status_at_archive_time=line_item.line_item_status.value if line_item else workspace.workspace_status.value,
             artifact_type=ArtifactType.PAYLOAD_SNAPSHOT,
             retention_class=payload.retention_class,
         )
@@ -100,13 +111,21 @@ def record_restore_request(
     *,
     actor: AppUser,
     payload: RestoreRequest,
-) -> dict[str, str]:
+) -> ArchiveRestoreRequest:
+    restore_request = ArchiveRestoreRequest(
+        archive_catalog_entry_id=payload.archive_catalog_entry_id,
+        requested_by_user_id=actor.app_user_id,
+        status=RestoreStatus.REQUESTED,
+        reason=payload.reason,
+    )
+    session.add(restore_request)
+    session.flush()
     log_audit_event(
         session,
         event_type="archive_restore_requested",
         entity_type="archive_catalog_entry",
         entity_id=payload.archive_catalog_entry_id,
         actor_user=actor,
-        payload={"reason": payload.reason},
+        payload={"reason": payload.reason, "archive_restore_request_id": str(restore_request.archive_restore_request_id)},
     )
-    return {"status": "requested"}
+    return restore_request

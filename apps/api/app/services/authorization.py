@@ -8,7 +8,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.db.enums import AccessDecisionType, MembershipStatus, ParticipantRole, RoleCode, ScopeType
+from app.db.enums import AccessDecisionType, MembershipRole, MembershipStatus, ParticipantRole, RoleCode, ScopeType
 from app.db.models import AccessPolicyDecision, AppUser, GroupMembership, UserRoleAssignment, WorkspaceParticipant
 from app.services.audit import log_audit_event
 
@@ -43,13 +43,26 @@ def authorize(
         )
     ).all()
     role_codes = [assignment.role.role_code for assignment in assignments]
-    if required_roles and not any(role in role_codes for role in required_roles):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Required role missing.")
-
     is_global_admin = any(
         assignment.role.role_code == RoleCode.ADMIN and assignment.scope_type == ScopeType.GLOBAL
         for assignment in assignments
     )
+    membership = None
+    if access_group_id and not is_global_admin:
+        membership = session.scalar(
+            select(GroupMembership).where(
+                GroupMembership.access_group_id == access_group_id,
+                GroupMembership.app_user_id == user.app_user_id,
+                GroupMembership.membership_status == MembershipStatus.ACTIVE,
+            )
+        )
+
+    has_group_admin_membership = membership is not None and membership.membership_role == MembershipRole.GROUP_ADMIN
+    has_required_role = any(role in role_codes for role in required_roles)
+    if required_roles and not has_required_role:
+        if not (access_group_id and RoleCode.GROUP_ADMIN in required_roles and has_group_admin_membership):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Required role missing.")
+
     if is_global_admin and (access_group_id or workspace_id):
         log_audit_event(
             session,
@@ -60,16 +73,8 @@ def authorize(
             payload={"workspace_id": str(workspace_id) if workspace_id else None},
         )
 
-    if access_group_id and not is_global_admin:
-        membership = session.scalar(
-            select(GroupMembership).where(
-                GroupMembership.access_group_id == access_group_id,
-                GroupMembership.app_user_id == user.app_user_id,
-                GroupMembership.membership_status == MembershipStatus.ACTIVE,
-            )
-        )
-        if membership is None:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active group membership required.")
+    if access_group_id and not is_global_admin and membership is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active group membership required.")
 
     if workspace_id and participant_roles and not is_global_admin:
         participant = session.scalar(

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/**/*.test.ts tests/**/*.test.tsx"
   },
   "dependencies": {
     "@damah-noshem/shared": "0.1.0",
@@ -24,6 +25,7 @@
     "eslint-config-next": "^15.0.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }

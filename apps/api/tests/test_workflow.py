@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import func, select
 
-from app.db.models import CurrentPayload, FinalValue, LineItem, OutputBatchItem, ValidationIssue, Workspace
+from app.db.models import ArchiveCatalogEntry, CurrentPayload, FinalValue, LineItem, OutputBatchItem, ValidationIssue, Workspace
 from app.db.session import SessionLocal
 
 from conftest import login_as
@@ -118,3 +118,27 @@ def test_output_generation_includes_only_done_items_with_current_final_values(cl
     with SessionLocal() as session:
         batch_items = session.scalars(select(OutputBatchItem)).all()
         assert len(batch_items) == body["included_item_count"]
+
+
+def test_archive_restore_request_is_persisted_with_status(client):
+    login_as(client, "admin", "admin123")
+    workspace_id, open_item_id, _ = _seed_workspace_and_items()
+    with SessionLocal() as session:
+        payload = session.scalar(
+            select(CurrentPayload).where(CurrentPayload.workspace_id == workspace_id, CurrentPayload.line_item_id == open_item_id)
+        )
+        payload_id = payload.current_payload_id
+    archive_response = client.post(f"/api/v1/payloads/{payload_id}/archive", json={"snapshot_type": "monthly_archive"})
+    assert archive_response.status_code == 200
+    with SessionLocal() as session:
+        archive_entry = session.scalar(select(ArchiveCatalogEntry).where(ArchiveCatalogEntry.line_item_id == open_item_id))
+        archive_entry_id = archive_entry.archive_catalog_entry_id
+    restore_response = client.post(
+        "/api/v1/archive/restore-requests",
+        json={"archive_catalog_entry_id": str(archive_entry_id), "reason": "investigation"},
+    )
+    assert restore_response.status_code == 200
+    restore_request_id = restore_response.json()["archive_restore_request_id"]
+    status_response = client.get(f"/api/v1/archive/restore-requests/{restore_request_id}")
+    assert status_response.status_code == 200
+    assert status_response.json()["status"] == "requested"

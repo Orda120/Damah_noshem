@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
 from app.db.enums import RoleCode
-from app.db.models import AppUser, Template
+from app.db.models import AppUser, Template, TemplateSchemaSnapshot
 from app.db.session import get_db
 from app.schemas.api import TemplateCreateRequest, TemplateUpdateRequest
 from app.schemas.serializers import serialize_template
@@ -72,3 +72,30 @@ def update_template_route(
     db.commit()
     db.refresh(template)
     return serialize_template(template)
+
+
+@router.get("/{template_id}/snapshots")
+def list_template_snapshots(
+    template_id: UUID,
+    current_user: AppUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    authorize(session=db, user=current_user, required_roles=[])
+    template = db.get(Template, template_id)
+    if template is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found.")
+    snapshots = db.scalars(
+        select(TemplateSchemaSnapshot)
+        .where(TemplateSchemaSnapshot.template_id == template_id)
+        .order_by(TemplateSchemaSnapshot.created_at.desc())
+    ).all()
+    return [
+        {
+            "template_schema_snapshot_id": str(snapshot.template_schema_snapshot_id),
+            "template_version_number": snapshot.template_version_number,
+            "schema_json": snapshot.schema_json,
+            "created_at": snapshot.created_at.isoformat(),
+            "artifact_id": str(snapshot.artifact_id) if snapshot.artifact_id else None,
+        }
+        for snapshot in snapshots
+    ]

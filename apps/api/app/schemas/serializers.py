@@ -153,6 +153,7 @@ def serialize_workspace_detail(
         "business_date": workspace.business_date.isoformat() if workspace.business_date else None,
         "workspace_status": workspace.workspace_status.value,
         "access_group_id": str(workspace.access_group_id),
+        "latest_revision_number": revisions[0].revision_number if revisions else 0,
         "template": serialize_template(template),
         "participants": [
             {

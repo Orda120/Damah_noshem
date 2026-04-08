@@ -11,6 +11,7 @@ The implementation follows `docs/ERD.md` plus the product requirements in this r
 ## What Exists
 
 - Password-based auth with HTTP-only session cookie
+- Stubbed SSO start/callback plus identity-linking-required and identity-link completion flows
 - Centralized authorization with role, group, workspace, and optional access-policy checks
 - Template and field-definition management in PostgreSQL
 - Workspace, participant, and line-item lifecycle flows
@@ -19,8 +20,9 @@ The implementation follows `docs/ERD.md` plus the product requirements in this r
 - Clarification, comment, recommendation, and final-value workflow
 - Append-only final values and status histories
 - Artifact upload, output generation, and archive stub-row flow
+- Archive catalog search, restore request persistence, and restore-status lookup
 - Hebrew-first web UI with English switch and RTL/LTR support
-- Seed/demo data and backend tests for critical flows
+- Seed/demo data plus backend and frontend smoke tests for critical flows
 
 ## Repository Layout
 
@@ -71,6 +73,7 @@ Frontend:
 
 ```bash
 npm install
+npm run test --workspace @damah-noshem/web
 npm run typecheck --workspace @damah-noshem/web
 npm run lint --workspace @damah-noshem/web
 npm run build --workspace @damah-noshem/web
@@ -94,6 +97,7 @@ npm run dev --workspace @damah-noshem/web
 Verified locally in this workspace:
 
 - `python -m pytest` in `apps/api`
+- `npm run test --workspace @damah-noshem/web`
 - `npm run typecheck --workspace @damah-noshem/web`
 - `npm run lint --workspace @damah-noshem/web`
 - `npm run build --workspace @damah-noshem/web`

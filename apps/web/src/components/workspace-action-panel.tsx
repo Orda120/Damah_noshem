@@ -16,15 +16,24 @@ type LineItemRecord = {
   payloads: Array<{ payload_json: Record<string, unknown> | null }>;
 };
 
+function parseJsonInput(raw: string) {
+  return JSON.parse(raw) as Record<string, unknown>;
+}
+
 export function WorkspaceActionPanel({
   workspaceId,
   lineItems,
+  latestRevisionNumber,
+  currentUserRoles,
 }: Readonly<{
   workspaceId: string;
   lineItems: LineItemRecord[];
+  latestRevisionNumber: number;
+  currentUserRoles: string[];
 }>) {
   const router = useRouter();
   const [selectedLineItemId, setSelectedLineItemId] = useState(lineItems[0]?.line_item_id ?? "");
+  const [revisionNumber, setRevisionNumber] = useState(latestRevisionNumber);
   const selectedLineItem = lineItems.find((item) => item.line_item_id === selectedLineItemId) ?? lineItems[0];
   const [payloadJson, setPayloadJson] = useState(
     JSON.stringify(selectedLineItem?.payloads[0]?.payload_json ?? { reported_amount: 0 }, null, 2),
@@ -36,11 +45,30 @@ export function WorkspaceActionPanel({
   );
   const [statusAction, setStatusAction] = useState("done");
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  async function refreshAfter<T>(promise: Promise<T>) {
-    await promise;
-    router.refresh();
-    setMessage("Saved");
+  if (!lineItems.length) {
+    return <p className="text-sm text-stone-500">No active line items available for editing.</p>;
+  }
+
+  const canEditPayload = currentUserRoles.some((role) => ["submitter", "reviewer", "admin"].includes(role));
+  const canRequestClarification = currentUserRoles.some((role) => ["reviewer", "admin"].includes(role));
+  const canCreateInternalComment = currentUserRoles.some((role) => ["reviewer", "admin"].includes(role));
+  const canCreatePublicComment = currentUserRoles.some((role) => ["submitter", "reviewer", "admin"].includes(role));
+  const canRecommend = currentUserRoles.some((role) => ["reviewer", "admin"].includes(role));
+  const canFinalize = currentUserRoles.includes("admin");
+
+  async function refreshAfter<T>(promise: Promise<T>, onSuccess?: (result: T) => void) {
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await promise;
+      onSuccess?.(result);
+      router.refresh();
+      setMessage("Saved");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Request failed");
+    }
   }
 
   return (
@@ -65,114 +93,152 @@ export function WorkspaceActionPanel({
         </select>
       </div>
 
-      <section className="space-y-2 rounded-3xl border border-stone-200 bg-stone-50 p-4">
-        <h3 className="font-semibold">Payload edit</h3>
-        <Textarea value={payloadJson} onChange={(event) => setPayloadJson(event.target.value)} />
-        <Button
-          onClick={() =>
-            refreshAfter(
-              apiClientFetch(`/workspaces/${workspaceId}/line-items/${selectedLineItemId}/payloads`, {
-                method: "POST",
-                body: JSON.stringify({
-                  expected_revision_number: 0,
-                  payload_json: JSON.parse(payloadJson),
-                  revision_reason: "admin_edit",
+      {canEditPayload ? (
+        <section className="space-y-2 rounded-3xl border border-stone-200 bg-stone-50 p-4">
+          <h3 className="font-semibold">Payload edit</h3>
+          <Textarea value={payloadJson} onChange={(event) => setPayloadJson(event.target.value)} />
+          <Button
+            onClick={() =>
+              refreshAfter(
+                apiClientFetch<{ revision_number: number }>(`/workspaces/${workspaceId}/line-items/${selectedLineItemId}/payloads`, {
+                  method: "POST",
+                  body: JSON.stringify({
+                    expected_revision_number: revisionNumber,
+                    payload_json: parseJsonInput(payloadJson),
+                    revision_reason: currentUserRoles.includes("submitter") ? "submitter_edit" : "admin_edit",
+                  }),
                 }),
-              }),
-            )
-          }
-        >
-          Save payload
-        </Button>
-      </section>
+                (result) => setRevisionNumber(result.revision_number),
+              )
+            }
+          >
+            Save payload
+          </Button>
+        </section>
+      ) : null}
 
-      <section className="space-y-2 rounded-3xl border border-stone-200 bg-stone-50 p-4">
-        <h3 className="font-semibold">Clarification thread</h3>
-        <Textarea value={clarificationText} onChange={(event) => setClarificationText(event.target.value)} />
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            onClick={() =>
-              refreshAfter(
-                apiClientFetch(`/workspaces/${workspaceId}/line-items/${selectedLineItemId}/clarifications`, {
-                  method: "POST",
-                  body: JSON.stringify({ message: clarificationText }),
-                }),
-              )
-            }
-          >
-            Request clarification
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() =>
-              refreshAfter(
-                apiClientFetch(`/workspaces/${workspaceId}/line-items/${selectedLineItemId}/comments`, {
-                  method: "POST",
-                  body: JSON.stringify({
-                    comment_text: commentText,
-                    visibility_type: "internal_only",
-                  }),
-                }),
-              )
-            }
-          >
-            Add internal note
-          </Button>
-        </div>
-        <Input placeholder="Comment text" value={commentText} onChange={(event) => setCommentText(event.target.value)} />
-      </section>
+      {canRequestClarification || canCreateInternalComment || canCreatePublicComment ? (
+        <section className="space-y-2 rounded-3xl border border-stone-200 bg-stone-50 p-4">
+          <h3 className="font-semibold">Clarification thread</h3>
+          {canRequestClarification ? (
+            <>
+              <Textarea value={clarificationText} onChange={(event) => setClarificationText(event.target.value)} />
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  refreshAfter(
+                    apiClientFetch(`/workspaces/${workspaceId}/line-items/${selectedLineItemId}/clarifications`, {
+                      method: "POST",
+                      body: JSON.stringify({ message: clarificationText }),
+                    }),
+                  )
+                }
+              >
+                Request clarification
+              </Button>
+            </>
+          ) : null}
+          <Input placeholder="Comment text" value={commentText} onChange={(event) => setCommentText(event.target.value)} />
+          <div className="flex flex-wrap gap-2">
+            {canCreatePublicComment ? (
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  refreshAfter(
+                    apiClientFetch(`/workspaces/${workspaceId}/line-items/${selectedLineItemId}/comments`, {
+                      method: "POST",
+                      body: JSON.stringify({
+                        comment_text: commentText,
+                        visibility_type: "submitter_visible",
+                      }),
+                    }),
+                  )
+                }
+              >
+                Add visible comment
+              </Button>
+            ) : null}
+            {canCreateInternalComment ? (
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  refreshAfter(
+                    apiClientFetch(`/workspaces/${workspaceId}/line-items/${selectedLineItemId}/comments`, {
+                      method: "POST",
+                      body: JSON.stringify({
+                        comment_text: commentText,
+                        visibility_type: "internal_only",
+                      }),
+                    }),
+                  )
+                }
+              >
+                Add internal note
+              </Button>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
-      <section className="space-y-2 rounded-3xl border border-stone-200 bg-stone-50 p-4">
-        <h3 className="font-semibold">Recommendation and final decision</h3>
-        <Textarea value={recommendationText} onChange={(event) => setRecommendationText(event.target.value)} />
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            onClick={() =>
-              refreshAfter(
-                apiClientFetch(`/line-items/${selectedLineItemId}/recommendations`, {
-                  method: "POST",
-                  body: JSON.stringify({
-                    recommended_action: "done",
-                    recommended_final_value_json: JSON.parse(recommendationText),
-                  }),
-                }),
-              )
-            }
-          >
-            Save recommendation
-          </Button>
-          <select
-            className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm"
-            value={statusAction}
-            onChange={(event) => setStatusAction(event.target.value)}
-          >
-            <option value="done">done</option>
-            <option value="closed">closed</option>
-            <option value="open">reopen</option>
-            <option value="archived">archive</option>
-          </select>
-          <Button
-            onClick={() =>
-              refreshAfter(
-                apiClientFetch(`/line-items/${selectedLineItemId}/finalize`, {
-                  method: "POST",
-                  body: JSON.stringify({
-                    action: statusAction,
-                    final_value_json: JSON.parse(recommendationText),
-                    change_reason: "Updated from workspace detail panel",
-                  }),
-                }),
-              )
-            }
-          >
-            Apply final action
-          </Button>
-        </div>
-      </section>
+      {canRecommend || canFinalize ? (
+        <section className="space-y-2 rounded-3xl border border-stone-200 bg-stone-50 p-4">
+          <h3 className="font-semibold">Recommendation and final decision</h3>
+          <Textarea value={recommendationText} onChange={(event) => setRecommendationText(event.target.value)} />
+          <div className="flex flex-wrap gap-2">
+            {canRecommend ? (
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  refreshAfter(
+                    apiClientFetch(`/line-items/${selectedLineItemId}/recommendations`, {
+                      method: "POST",
+                      body: JSON.stringify({
+                        recommended_action: "done",
+                        recommended_final_value_json: parseJsonInput(recommendationText),
+                      }),
+                    }),
+                  )
+                }
+              >
+                Save recommendation
+              </Button>
+            ) : null}
+            {canFinalize ? (
+              <>
+                <select
+                  className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm"
+                  value={statusAction}
+                  onChange={(event) => setStatusAction(event.target.value)}
+                >
+                  <option value="done">done</option>
+                  <option value="closed">closed</option>
+                  <option value="open">reopen</option>
+                  <option value="archived">archive</option>
+                </select>
+                <Button
+                  onClick={() =>
+                    refreshAfter(
+                      apiClientFetch(`/line-items/${selectedLineItemId}/finalize`, {
+                        method: "POST",
+                        body: JSON.stringify({
+                          action: statusAction,
+                          final_value_json: parseJsonInput(recommendationText),
+                          change_reason: "Updated from workspace detail panel",
+                        }),
+                      }),
+                    )
+                  }
+                >
+                  Apply final action
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {message ? <p className="text-sm text-accent">{message}</p> : null}
+      {error ? <p className="text-sm text-alert">{error}</p> : null}
     </div>
   );
 }

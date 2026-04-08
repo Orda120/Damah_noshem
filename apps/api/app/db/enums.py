@@ -10,6 +10,7 @@ class LanguageCode(StrEnum):
 
 class AuthType(StrEnum):
     USERNAME_PASSWORD = "username_password"
+    SSO = "sso"
 
 
 class RoleCode(StrEnum):
@@ -157,3 +158,10 @@ class OutputScopeType(StrEnum):
     BUSINESS_DATE = "business_date"
     GROUP = "group"
     CUSTOM = "custom"
+
+
+class RestoreStatus(StrEnum):
+    REQUESTED = "requested"
+    READY = "ready"
+    COMPLETED = "completed"
+    FAILED = "failed"

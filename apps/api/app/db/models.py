@@ -33,6 +33,7 @@ from app.db.enums import (
     RecommendedAction,
     RevisionReason,
     RoleCode,
+    RestoreStatus,
     ScopeType,
     SnapshotType,
     TemplateStatus,
@@ -588,6 +589,21 @@ class ArchiveCatalogEntry(Base):
     artifact_type: Mapped[ArtifactType] = mapped_column(Enum(ArtifactType, native_enum=False), nullable=False)
     archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     retention_class: Mapped[str | None] = mapped_column(String(128))
+
+
+class ArchiveRestoreRequest(Base):
+    __tablename__ = "archive_restore_request"
+
+    archive_restore_request_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    archive_catalog_entry_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    requested_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("app_user.app_user_id"), nullable=False)
+    status: Mapped[RestoreStatus] = mapped_column(
+        Enum(RestoreStatus, native_enum=False), default=RestoreStatus.REQUESTED, nullable=False
+    )
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str | None] = mapped_column(Text)
+    failure_reason: Mapped[str | None] = mapped_column(Text)
 
 
 class AuditEvent(Base):

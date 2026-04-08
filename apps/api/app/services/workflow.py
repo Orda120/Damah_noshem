@@ -50,7 +50,9 @@ from app.schemas.api import (
     GroupCreateRequest,
     LineItemCreateInput,
     LineItemFinalizeRequest,
+    LineItemUpdateRequest,
     MembershipGrantRequest,
+    MembershipRoleUpdateRequest,
     ParticipantInput,
     PayloadSaveRequest,
     RecommendationCreateRequest,
@@ -58,6 +60,7 @@ from app.schemas.api import (
     TemplateUpdateRequest,
     WorkspaceCreateRequest,
     WorkspaceStatusChangeRequest,
+    WorkspaceUpdateRequest,
 )
 from app.services.audit import log_audit_event
 from app.services.validation import get_open_blocking_issues, replace_validation_issues
@@ -65,6 +68,14 @@ from app.services.validation import get_open_blocking_issues, replace_validation
 
 def hash_access_code(raw_code: str) -> str:
     return hashlib.sha256(raw_code.encode("utf-8")).hexdigest()
+
+
+def _is_expired(expires_at: datetime | None, *, now: datetime) -> bool:
+    if expires_at is None:
+        return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    return expires_at <= now
 
 
 def create_group(session: Session, *, actor: AppUser, payload: GroupCreateRequest) -> AccessGroup:
@@ -75,7 +86,7 @@ def create_group(session: Session, *, actor: AppUser, payload: GroupCreateReques
     if (
         access_code is None
         or access_code.is_revoked
-        or (access_code.expires_at is not None and access_code.expires_at <= now)
+        or _is_expired(access_code.expires_at, now=now)
         or access_code.use_count >= access_code.max_uses
     ):
         event = GroupCreationEvent(
@@ -169,6 +180,25 @@ def revoke_group_membership(session: Session, *, actor: AppUser, membership: Gro
         entity_id=membership.group_membership_id,
         actor_user=actor,
         payload={"group_id": str(membership.access_group_id)},
+    )
+    return membership
+
+
+def update_group_membership_role(
+    session: Session,
+    *,
+    actor: AppUser,
+    membership: GroupMembership,
+    payload: MembershipRoleUpdateRequest,
+) -> GroupMembership:
+    membership.membership_role = payload.membership_role
+    log_audit_event(
+        session,
+        event_type="group_membership_granted",
+        entity_type="group_membership",
+        entity_id=membership.group_membership_id,
+        actor_user=actor,
+        payload={"group_id": str(membership.access_group_id), "membership_role": payload.membership_role.value},
     )
     return membership
 
@@ -333,6 +363,19 @@ def change_workspace_status(
     return workspace
 
 
+def update_workspace(
+    session: Session,
+    *,
+    workspace: Workspace,
+    payload: WorkspaceUpdateRequest,
+) -> Workspace:
+    if payload.workspace_title is not None:
+        workspace.workspace_title = payload.workspace_title
+    if payload.business_date is not None:
+        workspace.business_date = payload.business_date
+    return workspace
+
+
 def add_workspace_participant(
     session: Session,
     *,
@@ -376,6 +419,20 @@ def add_line_item(
         )
     )
     return row
+
+
+def update_line_item(
+    *,
+    line_item: LineItem,
+    payload: LineItemUpdateRequest,
+) -> LineItem:
+    if payload.line_item_title is not None:
+        line_item.line_item_title = payload.line_item_title
+    if payload.line_item_status is not None:
+        line_item.line_item_status = payload.line_item_status
+    if payload.closed_reason is not None:
+        line_item.closed_reason = payload.closed_reason
+    return line_item
 
 
 def _resolve_actor_editability(

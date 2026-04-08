@@ -190,6 +190,24 @@ def main() -> None:
         ensure_role_assignment(session, user=submitter, role=roles[RoleCode.SUBMITTER], scope_type=ScopeType.GLOBAL)
         ensure_role_assignment(session, user=group_admin, role=roles[RoleCode.GROUP_ADMIN], scope_type=ScopeType.GLOBAL)
 
+        if session.scalar(
+            select(AuthIdentity).where(
+                AuthIdentity.app_user_id == admin.app_user_id,
+                AuthIdentity.auth_type == AuthType.SSO,
+                AuthIdentity.external_subject == "stub-admin-subject",
+                AuthIdentity.disabled_at.is_(None),
+            )
+        ) is None:
+            session.add(
+                AuthIdentity(
+                    app_user_id=admin.app_user_id,
+                    auth_type=AuthType.SSO,
+                    external_subject="stub-admin-subject",
+                    is_primary=False,
+                    is_verified=True,
+                )
+            )
+
         group = session.scalar(select(AccessGroup).where(AccessGroup.group_name == "Finance Daily"))
         if group is None:
             group = AccessGroup(
