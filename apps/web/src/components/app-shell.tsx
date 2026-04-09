@@ -76,9 +76,7 @@ export function AppShell({
           </ul>
 
           <div className="relative" ref={dropdownRef}>
-            {/* eslint-disable-next-line jsx-a11y/aria-proptypes */}
             <button
-              aria-expanded={isDropdownOpen}
               aria-label={messages.settings}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-base text-white transition hover:bg-ink/80"
               onClick={() => setIsDropdownOpen((value) => !value)}
