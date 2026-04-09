@@ -42,5 +42,8 @@
   "adminGroups": "Manage groups",
   "currentWorkflow": "Current workflow",
   "lastActivity": "Last activity",
-  "noActiveWorkflow": "No active workflow in this group"
+  "noActiveWorkflow": "No active workflow in this group",
+  "exportWorkflow": "Export",
+  "selectRowToAct": "Select a row to act on",
+  "rowActions": "Row actions"
 }

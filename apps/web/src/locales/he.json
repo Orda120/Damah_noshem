@@ -42,5 +42,8 @@
   "adminGroups": "ניהול קבוצות",
   "currentWorkflow": "תהליך נוכחי",
   "lastActivity": "פעילות אחרונה",
-  "noActiveWorkflow": "אין תהליך פעיל בקבוצה זו"
+  "noActiveWorkflow": "אין תהליך פעיל בקבוצה זו",
+  "exportWorkflow": "ייצוא",
+  "selectRowToAct": "בחרו שורה לפעולות",
+  "rowActions": "פעולות על הפריט"
 }

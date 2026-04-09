@@ -23,8 +23,6 @@ export function AppShell({
 
   const navItems = [
     { href: buildLocaleHref(locale, "/groups"), label: messages.groups },
-    { href: buildLocaleHref(locale, "/output"), label: messages.output },
-    { href: buildLocaleHref(locale, "/archive"), label: messages.archive },
     { href: buildLocaleHref(locale, "/admin/groups"), label: messages.adminGroups },
     { href: buildLocaleHref(locale, "/admin/templates"), label: messages.templates },
     { href: buildLocaleHref(locale, "/admin/users"), label: messages.adminPanel },
@@ -48,7 +46,7 @@ export function AppShell({
   return (
     <div className="page-shell min-h-screen">
       <nav className="sticky top-0 z-40 border-b border-black/10 bg-white/80 shadow-sm backdrop-blur">
-        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-6 px-8 py-3">
+        <div className="mx-auto flex w-full items-center gap-6 px-8 py-3">
           <Link
             className="font-display text-xl font-semibold text-ink"
             href={buildLocaleHref(locale, "/groups")}
@@ -75,7 +73,7 @@ export function AppShell({
             })}
           </ul>
 
-          <div className="relative" ref={dropdownRef}>
+          <div className={clsx("relative", locale === "he" ? "mr-auto" : "ml-auto")} ref={dropdownRef}>
             <button
               aria-label={messages.settings}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-base text-white transition hover:bg-ink/80"
@@ -85,7 +83,12 @@ export function AppShell({
               &#9776;
             </button>
             {isDropdownOpen ? (
-              <div className="absolute right-0 mt-2 w-48 rounded-2xl border border-stone-200 bg-white shadow-lg">
+              <div
+                className={clsx(
+                  "absolute mt-2 w-48 rounded-2xl border border-stone-200 bg-white shadow-lg",
+                  locale === "he" ? "left-0" : "right-0",
+                )}
+              >
                 <div className="py-2">
                   <Link
                     className="block px-4 py-2 text-sm text-ink hover:bg-stone-50"
@@ -99,7 +102,7 @@ export function AppShell({
                   <LogoutButton
                     locale={locale}
                     label={messages.logout}
-                    className="w-full rounded-xl px-4 py-2 text-left text-sm text-alert hover:bg-red-50"
+                    className="w-full rounded-xl px-4 py-2 text-start text-sm text-alert hover:bg-red-50"
                   />
                 </div>
               </div>
@@ -108,7 +111,7 @@ export function AppShell({
         </div>
       </nav>
 
-      <main className="mx-auto max-w-screen-2xl px-8 py-6">{children}</main>
+      <main className="mx-auto w-full px-8 py-6">{children}</main>
     </div>
   );
 }

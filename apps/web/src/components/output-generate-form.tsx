@@ -25,6 +25,7 @@ export function OutputGenerateForm() {
       }}
     >
       <select
+        aria-label="Scope type"
         className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm"
         value={scopeType}
         onChange={(event) => setScopeType(event.target.value)}

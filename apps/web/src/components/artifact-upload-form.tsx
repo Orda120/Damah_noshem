@@ -57,6 +57,7 @@ export function ArtifactUploadForm({ entityType, entityId, linkRole = "supportin
         <input
           ref={inputRef}
           type="file"
+          aria-label="Upload document file"
           className="flex-1 rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-stone-100 file:px-3 file:py-1 file:text-xs file:font-medium"
         />
         <Button onClick={handleUpload} disabled={uploading} variant="secondary">
