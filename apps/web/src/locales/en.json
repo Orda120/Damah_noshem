@@ -33,6 +33,8 @@
   "saving": "Saving...",
   "languageUpdateFailed": "Unable to update language right now.",
   "logoutDescription": "Sign out from the current session from this section.",
+  "desktopOnlyTitle": "Desktop browser required",
+  "desktopOnlyBody": "Damah_noshem is intentionally supported only on desktop and laptop browsers. Open this application on a computer with a wider screen.",
   "adminPanel": "Admin",
   "workspaceDetail": "Workspace Detail",
   "generateOutput": "Generate Output",

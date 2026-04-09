@@ -33,6 +33,8 @@
   "saving": "שומר...",
   "languageUpdateFailed": "לא ניתן לעדכן את השפה כרגע.",
   "logoutDescription": "ניתן להתנתק מהמערכת דרך האזור הזה.",
+  "desktopOnlyTitle": "השימוש אפשרי רק במחשב",
+  "desktopOnlyBody": "Damah_noshem נתמכת באופן מכוון רק בדפדפני דסקטופ ולפטופ. פתחו את המערכת ממחשב עם רוחב מסך מתאים.",
   "adminPanel": "ניהול",
   "workspaceDetail": "פרטי מרחב עבודה",
   "generateOutput": "ייצוא סופי",

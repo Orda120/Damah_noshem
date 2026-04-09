@@ -74,8 +74,9 @@ export function WorkspaceActionPanel({
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-2 block text-sm font-medium">Line item</label>
+        <label htmlFor="line-item-select" className="mb-2 block text-sm font-medium">Line item</label>
         <select
+          id="line-item-select"
           className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm"
           value={selectedLineItemId}
           onChange={(event) => {
@@ -206,6 +207,7 @@ export function WorkspaceActionPanel({
             {canFinalize ? (
               <>
                 <select
+                  aria-label="Status action"
                   className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm"
                   value={statusAction}
                   onChange={(event) => setStatusAction(event.target.value)}

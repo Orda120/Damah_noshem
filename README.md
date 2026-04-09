@@ -22,6 +22,7 @@ The implementation follows `docs/ERD.md` plus the product requirements in this r
 - Artifact upload, output generation, and archive stub-row flow
 - Archive catalog search, restore request persistence, and restore-status lookup
 - Hebrew-first web UI with English switch and RTL/LTR support
+- Desktop-browser-only UI with explicit small-screen rejection instead of mobile navigation
 - Seed/demo data plus backend and frontend smoke tests for critical flows
 
 ## Repository Layout

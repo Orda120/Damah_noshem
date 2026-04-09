@@ -8,6 +8,7 @@
 4. The SSO flow is implemented as a local stub for MVP integration and testing. It distinguishes linked SSO identities, known-but-unlinked company people, and unknown identities without depending on a real external IdP yet.
 5. Group creation is currently allowed for any authenticated enabled user who presents a valid group-creation access code.
 6. Archive restore persists a real restore-request row with status tracking, but the operational restore worker still stops at audited request creation rather than automatically rehydrating payload data into the hot store.
+7. The web client intentionally targets desktop and laptop browsers only. Mobile-phone layouts and navigation paths are not supported; narrow screens receive an explicit unsupported notice.
 
 ## Design Hardening (2026-04-09)
 
