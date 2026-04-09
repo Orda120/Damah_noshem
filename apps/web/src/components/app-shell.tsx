@@ -4,6 +4,7 @@ import type { AppLocale } from "@damah-noshem/shared";
 
 import { buildLocaleHref } from "@/lib/api";
 import { getMessages } from "@/lib/i18n";
+import { LogoutButton } from "@/components/logout-button";
 
 export function AppShell({
   locale,
@@ -27,10 +28,11 @@ export function AppShell({
             <Link className="block rounded-2xl px-4 py-3 hover:bg-white/10" href={buildLocaleHref(locale, "/admin/groups")}>{messages.groups}</Link>
             <Link className="block rounded-2xl px-4 py-3 hover:bg-white/10" href={buildLocaleHref(locale, "/admin/templates")}>{messages.templates}</Link>
           </nav>
-          <div className="mt-auto pt-8">
+          <div className="mt-auto flex flex-col gap-3 pt-8">
             <Link className="rounded-full bg-white/10 px-4 py-2 text-sm" href={buildLocaleHref(altLocale, "/workspaces")}>
               {messages.languageSwitch}
             </Link>
+            <LogoutButton locale={locale} label={messages.logout} />
           </div>
         </aside>
         <main className="min-w-0 flex-1">{children}</main>
