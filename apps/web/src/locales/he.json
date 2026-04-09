@@ -38,5 +38,9 @@
   "adminPanel": "ניהול",
   "workspaceDetail": "פרטי מרחב עבודה",
   "generateOutput": "ייצוא סופי",
-  "archiveSearch": "חיפוש בארכיון"
+  "archiveSearch": "חיפוש בארכיון",
+  "adminGroups": "ניהול קבוצות",
+  "currentWorkflow": "תהליך נוכחי",
+  "lastActivity": "פעילות אחרונה",
+  "noActiveWorkflow": "אין תהליך פעיל בקבוצה זו"
 }

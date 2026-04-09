@@ -5,12 +5,12 @@ import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, nullslast, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.enums import MembershipStatus, RoleCode
-from app.db.models import AccessCode, AccessGroup, AppUser, GroupMembership
+from app.db.models import AccessCode, AccessGroup, AppUser, GroupMembership, Workspace
 from app.db.session import SessionLocal, get_db
 from app.schemas.api import AccessCodeIssueRequest, GroupCreateRequest, MembershipGrantRequest, MembershipRoleUpdateRequest
 from app.schemas.serializers import serialize_group_membership
@@ -32,26 +32,34 @@ router = APIRouter(tags=["groups"])
 @router.get("/groups")
 def list_groups(current_user: AppUser = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     roles = authorize(session=db, user=current_user, required_roles=[])
-    if "admin" in roles:
-        groups = db.scalars(select(AccessGroup).order_by(AccessGroup.group_name)).all()
-    else:
-        groups = db.scalars(
-            select(AccessGroup)
-            .join(GroupMembership, GroupMembership.access_group_id == AccessGroup.access_group_id)
-            .where(
-                GroupMembership.app_user_id == current_user.app_user_id,
-                GroupMembership.membership_status == MembershipStatus.ACTIVE,
-            )
-            .order_by(AccessGroup.group_name)
-        ).all()
+
+    latest_ws = (
+        select(Workspace.access_group_id, func.max(Workspace.updated_at).label("last_activity_at"))
+        .group_by(Workspace.access_group_id)
+        .subquery("latest_ws")
+    )
+
+    q = (
+        select(AccessGroup, latest_ws.c.last_activity_at)
+        .outerjoin(latest_ws, latest_ws.c.access_group_id == AccessGroup.access_group_id)
+    )
+    if "admin" not in roles:
+        q = q.join(GroupMembership, GroupMembership.access_group_id == AccessGroup.access_group_id).where(
+            GroupMembership.app_user_id == current_user.app_user_id,
+            GroupMembership.membership_status == MembershipStatus.ACTIVE,
+        )
+    q = q.order_by(nullslast(latest_ws.c.last_activity_at.desc()))
+
+    rows = db.execute(q).all()
     return [
         {
             "access_group_id": str(group.access_group_id),
             "group_name": group.group_name,
             "group_description": group.group_description,
             "group_status": group.group_status.value,
+            "last_activity_at": last_activity_at.isoformat() if last_activity_at else None,
         }
-        for group in groups
+        for group, last_activity_at in rows
     ]
 
 
@@ -121,6 +129,30 @@ def get_group(
         "group_status": group.group_status.value,
         "active_membership_count": active_count or 0,
     }
+
+
+@router.get("/groups/{group_id}/workspaces")
+def list_group_workspaces(
+    group_id: UUID,
+    current_user: AppUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    authorize(session=db, user=current_user, required_roles=[], access_group_id=group_id)
+    workspaces = db.scalars(
+        select(Workspace)
+        .where(Workspace.access_group_id == group_id)
+        .order_by(Workspace.updated_at.desc())
+    ).all()
+    return [
+        {
+            "workspace_id": str(w.workspace_id),
+            "workspace_title": w.workspace_title,
+            "business_date": w.business_date.isoformat() if w.business_date else None,
+            "workspace_status": w.workspace_status.value,
+            "updated_at": w.updated_at.isoformat(),
+        }
+        for w in workspaces
+    ]
 
 
 @router.post("/access-codes", status_code=status.HTTP_201_CREATED)

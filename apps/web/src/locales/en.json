@@ -38,5 +38,9 @@
   "adminPanel": "Admin",
   "workspaceDetail": "Workspace Detail",
   "generateOutput": "Generate Output",
-  "archiveSearch": "Archive Search"
+  "archiveSearch": "Archive Search",
+  "adminGroups": "Manage groups",
+  "currentWorkflow": "Current workflow",
+  "lastActivity": "Last activity",
+  "noActiveWorkflow": "No active workflow in this group"
 }

@@ -22,10 +22,10 @@ export function AppShell({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const navItems = [
-    { href: buildLocaleHref(locale, "/workspaces"), label: messages.workspaceQueue },
+    { href: buildLocaleHref(locale, "/groups"), label: messages.groups },
     { href: buildLocaleHref(locale, "/output"), label: messages.output },
     { href: buildLocaleHref(locale, "/archive"), label: messages.archive },
-    { href: buildLocaleHref(locale, "/admin/groups"), label: messages.groups },
+    { href: buildLocaleHref(locale, "/admin/groups"), label: messages.adminGroups },
     { href: buildLocaleHref(locale, "/admin/templates"), label: messages.templates },
     { href: buildLocaleHref(locale, "/admin/users"), label: messages.adminPanel },
   ];
@@ -51,7 +51,7 @@ export function AppShell({
         <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-6 px-8 py-3">
           <Link
             className="font-display text-xl font-semibold text-ink"
-            href={buildLocaleHref(locale, "/workspaces")}
+            href={buildLocaleHref(locale, "/groups")}
           >
             {messages.appTitle}
           </Link>
@@ -76,8 +76,9 @@ export function AppShell({
           </ul>
 
           <div className="relative" ref={dropdownRef}>
+            {/* eslint-disable-next-line jsx-a11y/aria-proptypes */}
             <button
-              aria-expanded={!!isDropdownOpen}
+              aria-expanded={isDropdownOpen}
               aria-label={messages.settings}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-base text-white transition hover:bg-ink/80"
               onClick={() => setIsDropdownOpen((value) => !value)}
