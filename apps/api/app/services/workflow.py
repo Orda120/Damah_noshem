@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db.enums import (
     AttemptStatus,
+    ClarificationStatus,
     CommentVisibilityType,
     LineItemStatus,
     MembershipRole,
@@ -733,6 +734,11 @@ def finalize_line_item(
     line_item.line_item_status = payload.action
     if payload.action == LineItemStatus.CLOSED:
         line_item.closed_reason = payload.change_reason
+
+    # ---- auto-close open clarifications on Done or Closed ----
+    if payload.action in {LineItemStatus.DONE, LineItemStatus.CLOSED}:
+        _auto_close_clarifications(session, actor=actor, line_item=line_item)
+
     session.add(
         LineItemStatusHistory(
             line_item_id=line_item.line_item_id,
@@ -751,6 +757,36 @@ def finalize_line_item(
         payload={"from_status": previous_status.value, "to_status": payload.action.value},
     )
     return line_item
+
+
+def _auto_close_clarifications(session: Session, *, actor: AppUser, line_item: LineItem) -> None:
+    """Close all open or answered clarifications for a line item when it reaches Done or Closed."""
+    open_clarifications = session.scalars(
+        select(ClarificationRequest).where(
+            ClarificationRequest.line_item_id == line_item.line_item_id,
+            ClarificationRequest.status.in_([ClarificationStatus.OPEN, ClarificationStatus.ANSWERED]),
+        )
+    ).all()
+    if not open_clarifications:
+        return
+    now = datetime.now(UTC)
+    closed_ids = []
+    for clarification in open_clarifications:
+        clarification.status = ClarificationStatus.CLOSED
+        clarification.closed_at = now
+        closed_ids.append(str(clarification.clarification_request_id))
+    log_audit_event(
+        session,
+        event_type="clarifications_auto_closed",
+        entity_type="line_item",
+        entity_id=line_item.line_item_id,
+        actor_user=actor,
+        payload={
+            "closed_count": len(closed_ids),
+            "clarification_request_ids": closed_ids,
+            "trigger": line_item.line_item_status.value,
+        },
+    )
 
 
 def resolve_validation_issue(session: Session, *, actor: AppUser, issue: ValidationIssue) -> ValidationIssue:

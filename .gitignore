@@ -25,3 +25,5 @@ apps/web/coverage/
 *.egg-info/
 apps/api/data/
 tmp/
+test_output.txt
+test_result.txt

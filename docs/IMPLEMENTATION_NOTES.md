@@ -9,6 +9,31 @@
 5. Group creation is currently allowed for any authenticated enabled user who presents a valid group-creation access code.
 6. Archive restore persists a real restore-request row with status tracking, but the operational restore worker still stops at audited request creation rather than automatically rehydrating payload data into the hot store.
 
+## Design Hardening (2026-04-09)
+
+### Archive Idempotency (Flow 6)
+
+- **`archive_current_payload`** is now fully retry-safe:
+  - Returns early if the payload is already fully archived (`payload_archived=True`).
+  - Checks for an existing `PayloadSnapshot` for the same `(workspace_id, line_item_id, workspace_revision_id)` before creating a new one.
+  - When an existing snapshot is found, verifies the blob's SHA-256 checksum against the current payload to catch corrupted partial writes.
+  - Only writes the `ArchiveCatalogEntry` if one does not already exist for that artifact/workspace/line_item combination.
+- **`record_restore_request`** is now idempotent: if a restore request already exists for the same `archive_catalog_entry_id` with status `REQUESTED`, the existing request is returned without creating a duplicate.
+
+### Output Batch Concurrent Safety (Flow 7)
+
+- `generate_output_batch` acquires `FOR UPDATE` locks on the scoped items **before** computing counts, not after. This prevents a TOCTOU race where final values change between the preview query and the locked generation query.
+- `preview_output_rows` remains available as a separate read-only preview for the UI.
+
+### Clarification Auto-Close (Line Item Finalization)
+
+- When a line item is finalized as **Done** or **Closed**, all open or answered `ClarificationRequest` rows for that line item are automatically set to `CLOSED` with `closed_at` timestamp.
+- A single audit event `clarifications_auto_closed` is logged with the count and IDs of affected clarifications.
+
+### Group Creation Atomicity (Flow 2)
+
+- The `create_group_route` handler now catches commit failures and logs a `group_creation_commit_failed` audit event in a separate emergency session. This ensures the attempt is auditable even when the primary transaction fails.
+
 ## Deviations
 
 1. The API surface is grouped by domain under `/api/v1/*` using FastAPI routers. Exact route naming is derived from the ERD and task requirements because the expected API spec file is missing.

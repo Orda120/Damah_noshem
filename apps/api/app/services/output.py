@@ -74,16 +74,36 @@ def preview_output_rows(session: Session, *, payload: OutputGenerateRequest) -> 
 
 
 def generate_output_batch(session: Session, *, actor: AppUser, payload: OutputGenerateRequest) -> OutputBatch:
-    preview = preview_output_rows(session, payload=payload)
+    # Acquire FOR UPDATE lock first, then compute counts from locked data
+    # to prevent stale counts from concurrent final-value supersession.
     rows = session.execute(_scoped_items_query(payload).with_for_update()).all()
+
+    # Compute excluded counts under the same lock context.
+    scoped_workspaces = _scope_workspace_ids_subquery(payload)
+    excluded_open = session.scalar(
+        select(func.count(LineItem.line_item_id))
+        .join(Workspace, Workspace.workspace_id == LineItem.workspace_id)
+        .where(
+            Workspace.workspace_id.in_(select(scoped_workspaces.c.workspace_id)),
+            LineItem.line_item_status == LineItemStatus.OPEN,
+        )
+    ) or 0
+    excluded_closed = session.scalar(
+        select(func.count(LineItem.line_item_id))
+        .join(Workspace, Workspace.workspace_id == LineItem.workspace_id)
+        .where(
+            Workspace.workspace_id.in_(select(scoped_workspaces.c.workspace_id)),
+            LineItem.line_item_status == LineItemStatus.CLOSED,
+        )
+    ) or 0
 
     output_batch = OutputBatch(
         scope_type=payload.scope_type,
         scope_ref=payload.scope_ref,
         generated_by_user_id=actor.app_user_id,
-        included_item_count=preview["included_item_count"],
-        excluded_open_item_count=preview["excluded_open_item_count"],
-        excluded_closed_item_count=preview["excluded_closed_item_count"],
+        included_item_count=len(rows),
+        excluded_open_item_count=excluded_open,
+        excluded_closed_item_count=excluded_closed,
     )
     session.add(output_batch)
     session.flush()

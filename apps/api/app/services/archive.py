@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.enums import ArtifactEntityType, ArtifactLinkRole, ArtifactType, RestoreStatus, SnapshotType
@@ -32,10 +34,34 @@ def archive_current_payload(
     workspace: Workspace,
     payload: ArchivePayloadRequest,
 ) -> CurrentPayload:
+    # ---- idempotency: already fully archived ----
     if current_payload.payload_archived and current_payload.payload_artifact_id:
         return current_payload
     if current_payload.payload_json is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload body is empty.")
+
+    # ---- idempotency: check for a prior partial run that created a snapshot ----
+    existing_snapshot = session.scalar(
+        select(PayloadSnapshot).where(
+            PayloadSnapshot.workspace_id == current_payload.workspace_id,
+            PayloadSnapshot.line_item_id == current_payload.line_item_id,
+            PayloadSnapshot.workspace_revision_id == current_payload.workspace_revision_id,
+        )
+    )
+    if existing_snapshot is not None:
+        # A previous attempt already wrote the artifact + snapshot.
+        # Verify checksum to guard against corrupted partial writes.
+        existing_artifact = session.get(Artifact, existing_snapshot.artifact_id)
+        serialized = json.dumps(current_payload.payload_json, ensure_ascii=False).encode("utf-8")
+        expected_checksum = hashlib.sha256(serialized).hexdigest()
+        if existing_artifact is not None and existing_artifact.checksum == expected_checksum:
+            # Re-apply the stub transition that may have failed previously.
+            current_payload.payload_json = None
+            current_payload.payload_archived = True
+            current_payload.payload_artifact_id = existing_artifact.artifact_id
+            current_payload.archived_at = current_payload.archived_at or datetime.now(UTC)
+            return current_payload
+        # Checksum mismatch — fall through to re-archive to correct the inconsistency.
 
     line_item = session.get(LineItem, current_payload.line_item_id) if current_payload.line_item_id else None
     serialized = json.dumps(current_payload.payload_json, ensure_ascii=False).encode("utf-8")
@@ -76,20 +102,30 @@ def archive_current_payload(
         )
     )
     session.flush()
-    session.add(
-        ArchiveCatalogEntry(
-            artifact_id=artifact.artifact_id,
-            workspace_id=current_payload.workspace_id,
-            line_item_id=current_payload.line_item_id,
-            template_id=current_payload.template_id,
-            workspace_revision_id=current_payload.workspace_revision_id,
-            business_date=workspace.business_date,
-            access_group_id=workspace.access_group_id,
-            status_at_archive_time=line_item.line_item_status.value if line_item else workspace.workspace_status.value,
-            artifact_type=ArtifactType.PAYLOAD_SNAPSHOT,
-            retention_class=payload.retention_class,
+
+    # ---- idempotency: avoid duplicate catalog entries ----
+    existing_catalog = session.scalar(
+        select(ArchiveCatalogEntry).where(
+            ArchiveCatalogEntry.artifact_id == artifact.artifact_id,
+            ArchiveCatalogEntry.workspace_id == current_payload.workspace_id,
+            ArchiveCatalogEntry.line_item_id == current_payload.line_item_id,
         )
     )
+    if existing_catalog is None:
+        session.add(
+            ArchiveCatalogEntry(
+                artifact_id=artifact.artifact_id,
+                workspace_id=current_payload.workspace_id,
+                line_item_id=current_payload.line_item_id,
+                template_id=current_payload.template_id,
+                workspace_revision_id=current_payload.workspace_revision_id,
+                business_date=workspace.business_date,
+                access_group_id=workspace.access_group_id,
+                status_at_archive_time=line_item.line_item_status.value if line_item else workspace.workspace_status.value,
+                artifact_type=ArtifactType.PAYLOAD_SNAPSHOT,
+                retention_class=payload.retention_class,
+            )
+        )
 
     current_payload.payload_json = None
     current_payload.payload_archived = True
@@ -112,6 +148,16 @@ def record_restore_request(
     actor: AppUser,
     payload: RestoreRequest,
 ) -> ArchiveRestoreRequest:
+    # ---- idempotency: return existing pending request ----
+    existing = session.scalar(
+        select(ArchiveRestoreRequest).where(
+            ArchiveRestoreRequest.archive_catalog_entry_id == payload.archive_catalog_entry_id,
+            ArchiveRestoreRequest.status == RestoreStatus.REQUESTED,
+        )
+    )
+    if existing is not None:
+        return existing
+
     restore_request = ArchiveRestoreRequest(
         archive_catalog_entry_id=payload.archive_catalog_entry_id,
         requested_by_user_id=actor.app_user_id,

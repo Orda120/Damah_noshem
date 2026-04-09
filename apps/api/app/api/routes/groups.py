@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from uuid import UUID
 
@@ -10,9 +11,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.enums import MembershipStatus, RoleCode
 from app.db.models import AccessCode, AccessGroup, AppUser, GroupMembership
-from app.db.session import get_db
+from app.db.session import SessionLocal, get_db
 from app.schemas.api import AccessCodeIssueRequest, GroupCreateRequest, MembershipGrantRequest, MembershipRoleUpdateRequest
 from app.schemas.serializers import serialize_group_membership
+from app.services.audit import log_audit_event
 from app.services.authorization import authorize
 from app.services.workflow import (
     create_group,
@@ -21,6 +23,8 @@ from app.services.workflow import (
     revoke_group_membership,
     update_group_membership_role,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["groups"])
 
@@ -63,7 +67,29 @@ def create_group_route(
     except HTTPException:
         db.commit()
         raise
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        # Log commit failure in an emergency session to preserve auditability
+        logger.exception("Group creation commit failed for group_name=%s", payload.group_name)
+        try:
+            with SessionLocal() as emergency_session:
+                log_audit_event(
+                    emergency_session,
+                    event_type="group_creation_commit_failed",
+                    entity_type="access_group",
+                    entity_id=None,
+                    actor_user=None,
+                    payload={"group_name": payload.group_name, "actor_user_id": str(current_user.app_user_id)},
+                )
+                emergency_session.commit()
+        except Exception:
+            logger.exception("Emergency audit log also failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Group creation failed. The attempt has been recorded.",
+        )
     return {
         "access_group_id": str(group.access_group_id),
         "group_name": group.group_name,
