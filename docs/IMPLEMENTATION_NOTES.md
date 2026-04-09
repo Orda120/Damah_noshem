@@ -9,6 +9,7 @@
 5. Group creation is currently allowed for any authenticated enabled user who presents a valid group-creation access code.
 6. Archive restore persists a real restore-request row with status tracking, but the operational restore worker still stops at audited request creation rather than automatically rehydrating payload data into the hot store.
 7. The web client intentionally targets desktop and laptop browsers only. Mobile-phone layouts and navigation paths are not supported; narrow screens receive an explicit unsupported notice.
+8. Local development defaults use host port `8001` for the FastAPI service because port `8000` is commonly occupied by gateway/proxy processes in the target environment.
 
 ## Design Hardening (2026-04-09)
 

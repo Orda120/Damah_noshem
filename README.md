@@ -46,9 +46,10 @@ docker compose up --build
 3. Open:
 
 - Web: [http://localhost:3000/he/login](http://localhost:3000/he/login)
-- API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+- API docs: [http://localhost:8001/docs](http://localhost:8001/docs)
 
 The compose flow runs Alembic, seeds demo data, then starts the API and web servers.
+The API host port defaults to `8001` to avoid collisions with local gateway or proxy services that often occupy `8000`.
 
 ## Demo Accounts
 

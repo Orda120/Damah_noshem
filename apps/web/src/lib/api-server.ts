@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 const API_BASE_URL =
   process.env.API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "http://localhost:8000/api/v1";
+  "http://localhost:8001/api/v1";
 
 export async function apiServerFetch(path: string, options?: RequestInit) {
   const cookieStore = await cookies();
@@ -12,18 +12,22 @@ export async function apiServerFetch(path: string, options?: RequestInit) {
     .map((cookie) => `${cookie.name}=${cookie.value}`)
     .join("; ");
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      ...(options?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        ...(options?.headers ?? {}),
+      },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return null;
+    }
+    return response.json();
+  } catch {
     return null;
   }
-  return response.json();
 }
