@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,8 +26,10 @@ def archive_payload_route(
 ) -> dict:
     current_payload = db.get(CurrentPayload, current_payload_id)
     if current_payload is None:
-        raise HTTPException(status_code=404, detail="Payload not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payload not found.")
     workspace = db.get(Workspace, current_payload.workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
     authorize(session=db, user=current_user, required_roles=[RoleCode.ADMIN], access_group_id=workspace.access_group_id)
     current_payload = archive_current_payload(
         db,
@@ -81,7 +83,7 @@ def get_archive_entry(
     authorize(session=db, user=current_user, required_roles=[RoleCode.REVIEWER, RoleCode.ADMIN])
     entry = db.get(ArchiveCatalogEntry, archive_catalog_entry_id)
     if entry is None:
-        raise HTTPException(status_code=404, detail="Archive entry not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archive entry not found.")
     return {
         "archive_catalog_entry_id": str(entry.archive_catalog_entry_id),
         "artifact_id": str(entry.artifact_id),
@@ -125,7 +127,7 @@ def get_restore_request_status(
     authorize(session=db, user=current_user, required_roles=[RoleCode.ADMIN])
     restore_request = db.get(ArchiveRestoreRequest, archive_restore_request_id)
     if restore_request is None:
-        raise HTTPException(status_code=404, detail="Restore request not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restore request not found.")
     return {
         "archive_restore_request_id": str(restore_request.archive_restore_request_id),
         "archive_catalog_entry_id": str(restore_request.archive_catalog_entry_id),

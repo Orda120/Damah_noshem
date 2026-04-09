@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -74,7 +74,7 @@ def get_output_batch(
     authorize(session=db, user=current_user, required_roles=[RoleCode.ADMIN])
     batch = db.get(OutputBatch, output_batch_id)
     if batch is None:
-        raise HTTPException(status_code=404, detail="Output batch not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Output batch not found.")
     return {
         "output_batch_id": str(batch.output_batch_id),
         "scope_type": batch.scope_type.value,
@@ -96,7 +96,7 @@ def list_output_batch_items(
     authorize(session=db, user=current_user, required_roles=[RoleCode.ADMIN])
     batch = db.get(OutputBatch, output_batch_id)
     if batch is None:
-        raise HTTPException(status_code=404, detail="Output batch not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Output batch not found.")
     items = db.scalars(
         select(OutputBatchItem).where(OutputBatchItem.output_batch_id == output_batch_id).order_by(OutputBatchItem.output_batch_item_id)
     ).all()

@@ -200,6 +200,8 @@ def update_line_item_route(
     if line_item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Line item not found.")
     workspace = db.get(Workspace, line_item.workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
     authorize(
         session=db,
         user=current_user,

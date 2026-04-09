@@ -215,7 +215,6 @@ class RoleGrantRequest(ApiModel):
     role_code: RoleCode
     scope_type: ScopeType = ScopeType.GLOBAL
     scope_id: UUID | None = None
-    failure_reason: str | None = None
 
 
 class ArtifactLinkRequest(ApiModel):
