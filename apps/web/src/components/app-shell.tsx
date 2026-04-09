@@ -1,42 +1,111 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import React, { useEffect, useState } from "react";
+
+import { clsx } from "clsx";
 
 import type { AppLocale } from "@damah-noshem/shared";
 
 import { buildLocaleHref } from "@/lib/api";
 import { getMessages } from "@/lib/i18n";
-import { LogoutButton } from "@/components/logout-button";
 
 export function AppShell({
   locale,
   children,
 }: Readonly<{ locale: AppLocale; children: React.ReactNode }>) {
   const messages = getMessages(locale);
-  const altLocale: AppLocale = locale === "he" ? "en" : "he";
+  const pathname = usePathname();
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const navItems = [
+    { href: buildLocaleHref(locale, "/workspaces"), label: messages.workspaceQueue },
+    { href: buildLocaleHref(locale, "/output"), label: messages.output },
+    { href: buildLocaleHref(locale, "/archive"), label: messages.archive },
+    { href: buildLocaleHref(locale, "/admin/groups"), label: messages.groups },
+    { href: buildLocaleHref(locale, "/admin/templates"), label: messages.templates },
+    { href: buildLocaleHref(locale, "/admin/users"), label: messages.adminPanel },
+  ];
+
+  useEffect(() => {
+    setIsNavOpen(false);
+    setIsSettingsOpen(false);
+  }, [pathname]);
 
   return (
-    <div className="page-shell min-h-screen">
-      <div className="mx-auto flex min-h-screen max-w-[1500px] gap-6 px-4 py-6 lg:px-8">
-        <aside className="hidden w-72 shrink-0 rounded-[28px] bg-ink p-6 text-white shadow-card lg:block">
-          <div className="mb-8">
-            <p className="text-xs uppercase tracking-[0.3em] text-white/60">Internal App</p>
-            <h1 className="mt-2 font-display text-3xl font-semibold">{messages.appTitle}</h1>
+    <div className="page-shell min-vh-100">
+      <nav className="navbar navbar-expand-lg navbar-light border-bottom border-black/10 bg-white/80 shadow-sm backdrop-blur">
+        <div className="container-fluid px-4 px-lg-5">
+          <Link className="navbar-brand font-display text-xl font-semibold text-ink" href={buildLocaleHref(locale, "/workspaces")}>
+            {messages.appTitle}
+          </Link>
+          <button
+            aria-controls="app-navbar-nav"
+            aria-expanded={isNavOpen}
+            aria-label="Toggle navigation"
+            className="navbar-toggler"
+            onClick={() => setIsNavOpen((current) => !current)}
+            type="button"
+          >
+            <span className="navbar-toggler-icon" />
+          </button>
+          <div className={clsx("collapse navbar-collapse", isNavOpen && "show")} id="app-navbar-nav">
+            <ul className="navbar-nav me-auto mb-3 mb-lg-0 gap-lg-2">
+              {navItems.map((item) => {
+                const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                return (
+                  <li className="nav-item" key={item.href}>
+                    <Link
+                      className={clsx(
+                        "nav-link rounded-pill px-3 py-2 text-ink transition-colors",
+                        isActive && "bg-ink text-white",
+                      )}
+                      href={item.href}
+                      onClick={() => {
+                        setIsNavOpen(false);
+                        setIsSettingsOpen(false);
+                      }}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="position-relative">
+              <button
+                aria-expanded={isSettingsOpen}
+                className="btn btn-outline-dark d-inline-flex items-center gap-2 rounded-pill border-0 bg-ink px-4 py-2 text-white"
+                onClick={() => setIsSettingsOpen((current) => !current)}
+                type="button"
+              >
+                <span aria-hidden="true" className="text-base leading-none">{"\u2630"}</span>
+                <span>{messages.settings}</span>
+              </button>
+              <div className={clsx("dropdown-menu dropdown-menu-end mt-2 border-0 shadow", isSettingsOpen && "show")}>
+                <h6 className="dropdown-header">{messages.settings}</h6>
+                <Link
+                  className="dropdown-item"
+                  href={buildLocaleHref(locale, "/settings#language")}
+                  onClick={() => setIsSettingsOpen(false)}
+                >
+                  {messages.language}
+                </Link>
+                <Link
+                  className="dropdown-item"
+                  href={buildLocaleHref(locale, "/settings#logout")}
+                  onClick={() => setIsSettingsOpen(false)}
+                >
+                  {messages.logout}
+                </Link>
+              </div>
+            </div>
           </div>
-          <nav className="space-y-2 text-sm">
-            <Link className="block rounded-2xl px-4 py-3 hover:bg-white/10" href={buildLocaleHref(locale, "/workspaces")}>{messages.workspaceQueue}</Link>
-            <Link className="block rounded-2xl px-4 py-3 hover:bg-white/10" href={buildLocaleHref(locale, "/output")}>{messages.output}</Link>
-            <Link className="block rounded-2xl px-4 py-3 hover:bg-white/10" href={buildLocaleHref(locale, "/archive")}>{messages.archive}</Link>
-            <Link className="block rounded-2xl px-4 py-3 hover:bg-white/10" href={buildLocaleHref(locale, "/admin/groups")}>{messages.groups}</Link>
-            <Link className="block rounded-2xl px-4 py-3 hover:bg-white/10" href={buildLocaleHref(locale, "/admin/templates")}>{messages.templates}</Link>
-          </nav>
-          <div className="mt-auto flex flex-col gap-3 pt-8">
-            <Link className="rounded-full bg-white/10 px-4 py-2 text-sm" href={buildLocaleHref(altLocale, "/workspaces")}>
-              {messages.languageSwitch}
-            </Link>
-            <LogoutButton locale={locale} label={messages.logout} />
-          </div>
-        </aside>
-        <main className="min-w-0 flex-1">{children}</main>
-      </div>
+        </div>
+      </nav>
+      <main className="container-fluid min-w-0 px-4 py-6 lg:px-5">{children}</main>
     </div>
   );
 }

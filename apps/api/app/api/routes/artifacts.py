@@ -5,6 +5,7 @@ import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import Response as HttpResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -141,6 +142,24 @@ def get_artifact(
             for link in links
         ],
     }
+
+
+@router.get("/{artifact_id}/download")
+def download_artifact(
+    artifact_id: UUID,
+    current_user: AppUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> HttpResponse:
+    authorize(session=db, user=current_user, required_roles=[])
+    artifact = db.get(Artifact, artifact_id)
+    if artifact is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found.")
+    data = get_storage().read_bytes(storage_uri=artifact.storage_uri)
+    return HttpResponse(
+        content=data,
+        media_type=artifact.mime_type,
+        headers={"Content-Disposition": f'attachment; filename="{artifact.file_name}"'},
+    )
 
 
 @router.post("/link", status_code=status.HTTP_201_CREATED)

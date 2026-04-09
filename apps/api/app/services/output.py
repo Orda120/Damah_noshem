@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import io
 import json
 from datetime import UTC, date, datetime
+
+import openpyxl
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
@@ -128,17 +131,34 @@ def generate_output_batch(session: Session, *, actor: AppUser, payload: OutputGe
             }
         )
 
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Export"
+    headers = ["workspace_id", "line_item_id", "line_item_key", "line_item_title", "final_value_id", "final_value_json"]
+    ws.append(headers)
+    for row in export_rows:
+        ws.append([
+            row["workspace_id"],
+            row["line_item_id"],
+            row["line_item_key"],
+            row["line_item_title"],
+            row["final_value_id"],
+            json.dumps(row["final_value_json"], ensure_ascii=False) if row["final_value_json"] is not None else "",
+        ])
+    buf = io.BytesIO()
+    wb.save(buf)
+    payload_bytes = buf.getvalue()
+
     storage = get_storage()
-    payload_bytes = json.dumps(export_rows, ensure_ascii=False).encode("utf-8")
     stored = storage.write_bytes(
-        relative_path=f"outputs/{output_batch.output_batch_id}.json",
+        relative_path=f"outputs/{output_batch.output_batch_id}.xlsx",
         payload=payload_bytes,
     )
     artifact = Artifact(
         artifact_type=ArtifactType.EXPORT_EXCEL,
         storage_uri=stored.storage_uri,
-        file_name=f"{output_batch.output_batch_id}.json",
-        mime_type="application/json",
+        file_name=f"{output_batch.output_batch_id}.xlsx",
+        mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         checksum=stored.checksum,
         file_size_bytes=stored.file_size_bytes,
         created_by_user_id=actor.app_user_id,

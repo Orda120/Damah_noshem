@@ -11,6 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+type LoginResponse = {
+  default_language: AppLocale;
+};
+
 export function LoginForm({ locale }: Readonly<{ locale: AppLocale }>) {
   const router = useRouter();
   const messages = getMessages(locale);
@@ -24,11 +28,11 @@ export function LoginForm({ locale }: Readonly<{ locale: AppLocale }>) {
     setError(null);
     setIsPending(true);
     try {
-      await apiClientFetch("/auth/login/password", {
+      const response = await apiClientFetch<LoginResponse>("/auth/login/password", {
         method: "POST",
         body: JSON.stringify({ username, password }),
       });
-      router.push(buildLocaleHref(locale, "/workspaces"));
+      router.push(buildLocaleHref(response.default_language ?? locale, "/workspaces"));
       router.refresh();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Login failed");

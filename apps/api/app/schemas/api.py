@@ -19,6 +19,8 @@ from app.db.enums import (
     RecommendedAction,
     RestoreStatus,
     RevisionReason,
+    RoleCode,
+    ScopeType,
     TemplateStatus,
     WorkspaceStatus,
 )
@@ -202,6 +204,17 @@ class RestoreStatusResponse(ApiModel):
     requested_at: datetime
     completed_at: datetime | None = None
     reason: str | None = None
+
+
+class UserPatchRequest(ApiModel):
+    is_enabled: bool | None = None
+    is_locked: bool | None = None
+
+
+class RoleGrantRequest(ApiModel):
+    role_code: RoleCode
+    scope_type: ScopeType = ScopeType.GLOBAL
+    scope_id: UUID | None = None
     failure_reason: str | None = None
 
 

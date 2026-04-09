@@ -45,11 +45,13 @@ export function WorkspaceDetailView({
   workspace,
   currentUserRoles,
   actionPanel,
+  artifactsPanel,
 }: Readonly<{
   locale: AppLocale;
   workspace: WorkspaceDetailRecord;
   currentUserRoles: string[];
   actionPanel?: React.ReactNode;
+  artifactsPanel?: React.ReactNode;
 }>) {
   const messages = getMessages(locale);
   const activeItems = workspace.line_items.filter((item) => item.line_item_status !== "archived");
@@ -201,9 +203,12 @@ export function WorkspaceDetailView({
         </Card>
       </div>
 
-      <Card className="h-fit">
-        {resolvedActionPanel}
-      </Card>
+      <div className="space-y-6">
+        <Card className="h-fit">
+          {resolvedActionPanel}
+        </Card>
+        {artifactsPanel ? <Card className="h-fit">{artifactsPanel}</Card> : null}
+      </div>
     </div>
   );
 }
