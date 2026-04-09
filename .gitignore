@@ -17,6 +17,7 @@ coverage/
 apps/api/.venv/
 apps/api/alembic/__pycache__/
 apps/web/.next/
+apps/web/.next-dev*.log
 apps/web/node_modules/
 apps/web/coverage/
 *.db
