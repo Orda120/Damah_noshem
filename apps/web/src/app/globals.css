@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-canvas text-ink font-sans;
+}
+
+a {
+  @apply text-inherit no-underline;
+}
+
+.page-shell {
+  background:
+    radial-gradient(circle at top left, rgba(29, 111, 95, 0.12), transparent 30%),
+    linear-gradient(180deg, #f7f1e4 0%, #f4efe7 100%);
+}
+
+.desktop-unsupported {
+  display: none;
+}
+
+.desktop-supported {
+  min-width: 1200px;
+}
+
+@media (max-width: 1023px) {
+  body {
+    min-width: 0;
+  }
+
+  .desktop-supported {
+    display: none;
+  }
+
+  .desktop-unsupported {
+    display: flex;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background:
+      radial-gradient(circle at top left, rgba(29, 111, 95, 0.12), transparent 30%),
+      linear-gradient(180deg, #f7f1e4 0%, #f4efe7 100%);
+  }
+}
